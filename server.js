@@ -10,13 +10,13 @@ const pg = require('pg');
 
 //Global vars
 const PORT = process.env.PORT || 3001;
-let location_id;
 
 const client = new pg.Client(process.env.DATABASE_URL);
 client.connect();
 client.on('error', error => {
   console.error(error);
 })
+
 
 //Apps
 const app = express();
@@ -29,6 +29,10 @@ app.get('/location', searchToLatLng);
 app.get('/weather', searchWeather);
 
 app.get('/events', searchEvents);
+
+app.get('/movies', searchMovies);
+
+// app.get('/yelp', searchFromYelp);
 
 app.use('*', (req, res) => {
   res.send('You got in the wrong place')
@@ -56,12 +60,46 @@ function FormattedEvent(data) {
   this.summary = data.description.text;
 }
 
+function FormattedMovies(data) {
+  this.title = data.original_title;
+  this.overview = data.overview;
+  this.average_votes = data.vote_average;
+  this.total_votes = data.vote_count;
+  this.image_url = `https://image.tmdb.org/t/p/w200_and_h300_bestv2${data.poster_path}`;
+  this.popularity = data.popularity;
+  this.released_on = data.release_date;
+}
+
+
+function searchFromYelp(request, response) {
+
+}
+
+function searchMovies(request, response) {
+
+  const movieName = request.query.data.search_query;
+
+  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&language=en-US&page=1&include_adult=false&query=${movieName}`
+
+  superagent.get(url)
+    .then(result => {
+      // console.log('Movies: ', result.body.results[0].vote_count);
+      const listOfMovies = result.body.results.map(item => {
+        return new FormattedMovies(item);
+      })
+      // console.log(listOfMovies);
+      response.send(listOfMovies);
+    }).catch(e => {
+      console.error(e);
+    })
+}
+
+
+
 function searchToLatLng(request, response) {
   let locationName = request.query.data || 'seattle';
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${locationName}&key=${process.env.GEOCODE_API_KEY}`;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${locationName}&key=${process.env.GEOCODE_API_KEY}`
 
-  // if is in database
-  // go get it from db
   client.query(`SELECT * FROM locations WHERE search_query=$1`, [locationName])
     .then(sqlResult => {
 
@@ -85,7 +123,7 @@ function searchToLatLng(request, response) {
             )
             response.send(location);
 
-            console.log(location_id,'new one')
+            // console.log(location_id, 'new one')
 
           }).catch(e => {
             console.error(e);
